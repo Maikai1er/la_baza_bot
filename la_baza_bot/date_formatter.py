@@ -1,15 +1,12 @@
-import datetime
-import locale
-
-locale.setlocale(locale.LC_TIME, 'ru_RU.UTF-8')
+from datetime import datetime
+from babel.dates import format_date
 
 
-def format_date(date_str):
-    current_year = datetime.datetime.now().year
+def format_date_russian(date_str):
+    current_year = datetime.now().year
 
-    date_obj = datetime.datetime.strptime(f'{date_str}.{current_year}', '%d.%m.%Y')
+    date_obj = datetime.strptime(f"{date_str}.{current_year}", "%d.%m.%Y")
 
-    formatted_date = date_obj.strftime('%d %B %Y (%A)')
+    formatted_date = format_date(date_obj, "d MMMM yyyy (EEEE)", locale='ru')
 
     return formatted_date
-
