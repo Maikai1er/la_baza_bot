@@ -1,65 +1,96 @@
 from telebot import TeleBot
 import sqlite3
+import threading
 
 
 class MafiaBot:
     def __init__(self, token):
         self.bot = TeleBot(token)
         self.conn = sqlite3.connect('event.db', check_same_thread=False)
+        self.lock = threading.Lock()  # Блокировка для обеспечения потокобезопасности
         self.cursor = self.conn.cursor()
         self.create_tables()
         self.setup_handlers()
 
     def create_tables(self):
-        self.cursor.execute('''
-        CREATE TABLE IF NOT EXISTS registrations (
-            user_id INTEGER PRIMARY KEY,
-            first_name TEXT,
-            last_name TEXT,
-            event_time TEXT,
-            registration_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-        ''')
-        self.conn.commit()
+        with self.lock:  # Использование блокировки для безопасного доступа к БД
+            self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tg_user_id INTEGER UNIQUE,
+                username TEXT
+            )
+            ''')
 
-        self.cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            user_id INTEGER PRIMARY KEY,
-            tg_user_id INTEGER,
-            username TEXT,
-            smiley TEXT
-        )
-        ''')
+            self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS registrations (
+                registration_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                event_time TEXT,
+                registration_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (user_id)
+            )
+            ''')
+            self.conn.commit()
 
     def setup_handlers(self):
         @self.bot.message_handler(commands=['start'])
         def handle_start(message):
-            first_name = message.from_user.first_name
-            last_name = message.from_user.last_name
-            full_name = f'{first_name} {last_name}' if last_name else first_name
-            self.bot.reply_to(message, f'Welcome, {full_name}!')
+            self.bot.reply_to(message,
+                              'Добро пожаловать! Вы можете зарегистрироваться с помощью команды "@la_baza_bot регистрация <Ваш ник>"')
 
         @self.bot.message_handler(func=lambda message: '@la_baza_bot' in message.text)
-        def execute_registration(message):
+        def handle_message(message):
             try:
-                tag, action, event_time = message.text.split(' ')
-                if action == 'запись':
-                    user_id = message.from_user.id
-                    first_name = message.from_user.first_name
-                    last_name = message.from_user.last_name
+                parts = message.text.split(' ', 2)
+                if len(parts) < 3:
+                    self.bot.reply_to(message, 'Неверный формат команды. Используйте "@la_baza_bot команда данные"')
+                    return
 
-                    self.cursor.execute('''
-                    INSERT OR REPLACE INTO registrations (user_id, first_name, last_name, event_time)
-                    VALUES (?, ?, ?, ?)
-                    ''', (user_id, first_name, last_name, event_time))
-                    self.conn.commit()
+                tag, action, data = parts
+                action = action.lower()
 
-                    full_name = f'{first_name} {last_name}' if last_name else first_name
-                    self.bot.reply_to(message, f'Вы успешно записаны на мероприятие, {full_name}!')
+                if action == 'регистрация':
+                    tg_user_id = message.from_user.id
+                    username = data.strip()
+
+                    with self.lock:
+                        self.cursor.execute('''
+                        INSERT OR REPLACE INTO users (tg_user_id, username)
+                        VALUES (?, ?)
+                        ''', (tg_user_id, username))
+                        self.conn.commit()
+
+                    self.bot.reply_to(message, f'Вы успешно зарегистрированы под ником {username}!')
+
+                elif action == 'запись':
+                    event_time = data.strip()
+                    tg_user_id = message.from_user.id
+
+                    with self.lock:
+                        self.cursor.execute('''
+                        SELECT user_id, username FROM users WHERE tg_user_id = ?
+                        ''', (tg_user_id,))
+                        user = self.cursor.fetchone()
+
+                        if user:
+                            user_id, username = user
+                            self.cursor.execute('''
+                            INSERT INTO registrations (user_id, event_time)
+                            VALUES (?, ?)
+                            ''', (user_id, event_time))
+                            self.conn.commit()
+                            self.bot.reply_to(message,
+                                              f'Вы успешно записаны на мероприятие, {username}, на время {event_time}!')
+                        else:
+                            self.bot.reply_to(message,
+                                              'Сначала зарегистрируйтесь с помощью команды "@la_baza_bot регистрация <Ваш ник>".')
+
                 else:
-                    self.bot.reply_to(message, 'Неверная команда. Используйте @la_baza_bot запись HH:MM')
+                    self.bot.reply_to(message,
+                                      'Неверная команда. Используйте "@la_baza_bot регистрация <Ваш ник>" или "@la_baza_bot запись HH:MM"')
             except ValueError:
-                self.bot.reply_to(message, 'Неверный формат команды. Используйте @la_baza_bot запись HH:MM')
+                self.bot.reply_to(message, 'Неверный формат команды. Используйте "@la_baza_bot команда данные"')
             except Exception as e:
                 self.bot.reply_to(message, f'Произошла ошибка: {e}')
 
