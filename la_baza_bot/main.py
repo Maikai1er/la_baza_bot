@@ -56,20 +56,24 @@ class MafiaBot:
         def handle_message(message):
             try:
                 bot_tag = "@la_baza_bot"
-                clean_message = message.replace(bot_tag, '').strip()
+                clean_message = message.text.replace(bot_tag, '').strip()
                 if clean_message == '+' or clean_message == '++':
                     self.register_for_event(message.from_user.id, event_time=self.time, message=message)
+                    return
+
+                if clean_message == 'очистить':
+                    self.clear_registrations(message)
+                    return
+
                 parts = message.text.split(' ', 2)
 
-                tag, action, data = parts[0], parts[1].lower().strip(), parts[2].lower().strip()
+                tag, action, data = parts[0], parts[1].strip(), parts[2].strip()
                 if action == 'открыть':
                     self.start_registration(data, message)
                 elif action == 'регистрация':
                     self.register_user(message.from_user.id, data, message)
                 elif action == 'запись':
                     self.register_for_event(message.from_user.id, data, message)
-                elif action == 'очистить':
-                    self.clear_registrations(message)
                 else:
                     self.bot.reply_to(message,
                                       'Неверная команда. Используйте "@la_baza_bot регистрация <Ваш ник>", '
@@ -90,7 +94,7 @@ class MafiaBot:
         if len(data_list) == 3:
             self.time = data_list[2]
         self.bot.reply_to(message, f'{self.date}, Запись открыта! 😎'
-                                   f'\n\n🕐{self.time}\n🗺{self.location}')
+                                   f'\n\n🕐 {self.time}\n🗺 {self.location}')
 
     def register_user(self, tg_user_id, username, message):
         try:
