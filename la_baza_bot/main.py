@@ -3,9 +3,24 @@ import sqlite3
 import threading
 
 
+class Event:
+    def __init__(self, time, location, date):
+        self.date = date
+        self.time = time
+        self.location = location
+        self.registration_open = False
+
+    def open_registration(self):
+        self.registration_open = True
+
+    def close_registration(self):
+        self.registration_open = False
+
+
 class MafiaBot:
-    def __init__(self, token):
+    def __init__(self, token, event):
         self.bot = TeleBot(token)
+        self.event = event
         self.conn = sqlite3.connect('event.db', check_same_thread=False)
         self.lock = threading.Lock()
         self.cursor = self.conn.cursor()
@@ -37,27 +52,26 @@ class MafiaBot:
         @self.bot.message_handler(commands=['start'])
         def handle_start(message):
             self.bot.reply_to(message,
-                              'Добро пожаловать! Вы можете зарегистрироваться с помощью команды "@la_baza_bot регистрация <Ваш ник>"')
+                              'Добро пожаловать! Вы можете зарегистрироваться с помощью команды "@la_baza_bot '
+                              'регистрация <Ваш ник>", либо записаться с помощью команды "@la_baza_bot запись <Время>"')
 
         @self.bot.message_handler(func=lambda message: '@la_baza_bot' in message.text)
         def handle_message(message):
             try:
                 parts = message.text.split(' ', 3)
-                if len(parts) < 3:
-                    self.bot.reply_to(message, 'Неверный формат команды. Используйте "@la_baza_bot команда данные"')
-                    return
 
-                tag, action, data = parts[0], parts[1].lower(), parts[2].strip()
+                tag, action, data = parts[0], parts[1].lower().strip(), parts[2].lower().strip()
 
                 if action == 'регистрация':
                     self.register_user(message.from_user.id, data, message)
-                elif action == 'запись':
+                if action == 'запись':
                     self.register_for_event(message.from_user.id, data, message)
                 else:
                     self.bot.reply_to(message,
-                                      'Неверная команда. Используйте "@la_baza_bot регистрация <Ваш ник>" или "@la_baza_bot запись HH:MM"')
+                                      'Неверная команда. Используйте "@la_baza_bot регистрация <Ваш ник>" или '
+                                      '"@la_baza_bot запись <Время>"')
             except ValueError:
-                self.bot.reply_to(message, 'Неверный формат команды. Используйте "@la_baza_bot команда данные"')
+                self.bot.reply_to(message, 'Неверный формат команды. Используйте "@la_baza_bot <Команда> <Данные>"')
             except Exception as e:
                 self.bot.reply_to(message, f'Произошла ошибка: {e}')
 
@@ -76,7 +90,8 @@ class MafiaBot:
             SELECT user_id, username FROM users WHERE tg_user_id = ?
             ''', (tg_user_id,))
             user = self.cursor.fetchone()
-
+            if not self.event.registration_open:
+                self.bot.reply_to(message, 'Нет активной записи на игры.')
             if user:
                 user_id, username = user
                 self.cursor.execute('''
@@ -99,7 +114,9 @@ class MafiaBot:
                 )
 
                 self.bot.reply_to(message,
-                                  f'Вы успешно записаны на мероприятие, {username}, на время {event_time}!\n\nСписок участников:\n{registration_list}')
+                                  f'Date запись открыта :sunglasses::\n{registration_list}')
+                if len(registrations) > 12:
+                    self.event.close_registration()
             else:
                 self.bot.reply_to(message,
                                   'Сначала зарегистрируйтесь с помощью команды "@la_baza_bot регистрация <Ваш ник>".')
