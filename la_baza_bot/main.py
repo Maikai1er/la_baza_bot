@@ -2,6 +2,7 @@ from telebot import TeleBot
 import sqlite3
 import threading
 from date_formatter import format_date_russian
+from emoji import emojize
 
 
 class MafiaBot:
@@ -54,6 +55,10 @@ class MafiaBot:
         @self.bot.message_handler(func=lambda message: '@la_baza_bot' in message.text)
         def handle_message(message):
             try:
+                bot_tag = "@la_baza_bot"
+                clean_message = message.replace(bot_tag, '').strip()
+                if clean_message == '+' or clean_message == '++':
+                    self.register_for_event(message.from_user.id, event_time=self.time, message=message)
                 parts = message.text.split(' ', 2)
 
                 tag, action, data = parts[0], parts[1].lower().strip(), parts[2].lower().strip()
@@ -69,6 +74,8 @@ class MafiaBot:
                     self.bot.reply_to(message,
                                       'Неверная команда. Используйте "@la_baza_bot регистрация <Ваш ник>", '
                                       '"@la_baza_bot запись <Время>" или "@la_baza_bot очистить"')
+            except IndexError:
+                self.bot.reply_to(message, 'Неверный формат команды. Используйте "@la_baza_bot <Команда> <Данные>"')
             except ValueError:
                 self.bot.reply_to(message, 'Неверный формат команды. Используйте "@la_baza_bot <Команда> <Данные>"')
             except Exception as e:
@@ -82,7 +89,8 @@ class MafiaBot:
             self.location = data_list[1]
         if len(data_list) == 3:
             self.time = data_list[2]
-        self.bot.reply_to(message, f'{self.date}, Запись открыта!\n\n {self.time}\n {self.location}')
+        self.bot.reply_to(message, f'{self.date}, Запись открыта! 😎'
+                                   f'\n\n🕐{self.time}\n🗺{self.location}')
 
     def register_user(self, tg_user_id, username, message):
         try:
@@ -132,12 +140,15 @@ class MafiaBot:
                         )
 
                         self.bot.reply_to(message,
-                                          f'{self.date}, Запись открыта!\n{registration_list}\n {self.time}\n {self.location}')
+                                          f'{self.date}, Запись открыта! 😎'
+                                          f'\n\n{registration_list}\n\n🕐 {self.time}\n'
+                                          f'🗺 {self.location}')
                         if len(registrations) > 12:
                             self.close_registration()
                     else:
                         self.bot.reply_to(message,
-                                          'Сначала зарегистрируйтесь с помощью команды "@la_baza_bot регистрация <Ваш ник>".')
+                                          'Сначала зарегистрируйтесь с помощью команды "@la_baza_bot регистрация <Ваш '
+                                          'ник>".')
         except sqlite3.Error as e:
             self.bot.reply_to(message, f'Произошла ошибка при записи на мероприятие: {e}')
 
