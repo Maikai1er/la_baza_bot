@@ -7,13 +7,13 @@ class MafiaBot:
     def __init__(self, token):
         self.bot = TeleBot(token)
         self.conn = sqlite3.connect('event.db', check_same_thread=False)
-        self.lock = threading.Lock()  # Блокировка для обеспечения потокобезопасности
+        self.lock = threading.Lock()
         self.cursor = self.conn.cursor()
         self.create_tables()
         self.setup_handlers()
 
     def create_tables(self):
-        with self.lock:  # Использование блокировки для безопасного доступа к БД
+        with self.lock:
             self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 user_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -80,8 +80,23 @@ class MafiaBot:
                             VALUES (?, ?)
                             ''', (user_id, event_time))
                             self.conn.commit()
+
+                            # Получение всех записанных пользователей
+                            self.cursor.execute('''
+                            SELECT u.username, r.event_time
+                            FROM registrations r
+                            JOIN users u ON r.user_id = u.user_id
+                            ORDER BY r.registration_time
+                            ''')
+                            registrations = self.cursor.fetchall()
+
+                            # Формирование списка участников
+                            registration_list = '\n'.join(
+                                [f'{i + 1}. {reg[0]}' + (f' {reg[1]}' if reg[1] != event_time else '') for i, reg in
+                                 enumerate(registrations)])
+
                             self.bot.reply_to(message,
-                                              f'Вы успешно записаны на мероприятие, {username}, на время {event_time}!')
+                                              f'Вы успешно записаны на мероприятие, {username}, на время {event_time}!\n\nСписок участников:\n{registration_list}')
                         else:
                             self.bot.reply_to(message,
                                               'Сначала зарегистрируйтесь с помощью команды "@la_baza_bot регистрация <Ваш ник>".')
@@ -103,7 +118,7 @@ class MafiaBot:
 
 
 if __name__ == "__main__":
-    TOKEN = 'YOUR_TELEGRAM_BOT_TOKEN'
+    TOKEN = '7489778031:AAFW7ZxD4H3wQcQ4rMmSOOFFzY_-4vRCeMg'
     bot = MafiaBot(TOKEN)
     try:
         bot.start_polling()
