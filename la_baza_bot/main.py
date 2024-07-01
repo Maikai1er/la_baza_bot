@@ -1,12 +1,12 @@
 from telebot import TeleBot
+from telebot.types import Message
 import sqlite3
 import threading
 from date_formatter import format_date_russian
-from emoji import emojize
 
 
 class MafiaBot:
-    def __init__(self, token):
+    def __init__(self, token: str):
         self.bot = TeleBot(token)
         self.conn = sqlite3.connect('event.db', check_same_thread=False, timeout=10)
         self.lock = threading.Lock()
@@ -17,13 +17,13 @@ class MafiaBot:
         self.location = 'https://maps.app.goo.gl/LLHVqSW4Do9ALm5R8?g_st=atm'
         self.registration_open = False
 
-    def open_registration(self):
+    def open_registration(self) -> None:
         self.registration_open = True
 
-    def close_registration(self):
+    def close_registration(self) -> None:
         self.registration_open = False
 
-    def create_tables(self):
+    def create_tables(self) -> None:
         with self.lock:
             with self.conn:
                 cursor = self.conn.cursor()
@@ -45,7 +45,7 @@ class MafiaBot:
                 ''')
                 self.conn.commit()
 
-    def setup_handlers(self):
+    def setup_handlers(self) -> None:
         @self.bot.message_handler(commands=['start'])
         def handle_start(message):
             self.bot.reply_to(message,
@@ -85,7 +85,7 @@ class MafiaBot:
             except Exception as e:
                 self.bot.reply_to(message, f'Произошла ошибка: {e}')
 
-    def start_registration(self, data, message):
+    def start_registration(self, data: str, message: Message) -> None:
         self.open_registration()
         data_list = data.split(' ')
         self.date = format_date_russian(data_list[0])
@@ -96,7 +96,7 @@ class MafiaBot:
         self.bot.reply_to(message, f'{self.date}, Запись открыта! 😎'
                                    f'\n\n🕐 {self.time}\n🗺 {self.location}')
 
-    def register_user(self, tg_user_id, username, message):
+    def register_user(self, tg_user_id: str, username: str, message: Message) -> None:
         try:
             with self.lock:
                 with self.conn:
@@ -110,7 +110,7 @@ class MafiaBot:
         except sqlite3.Error as e:
             self.bot.reply_to(message, f'Произошла ошибка при регистрации: {e}')
 
-    def register_for_event(self, tg_user_id, event_time, message):
+    def register_for_event(self, tg_user_id: str, event_time: str, message: Message) -> None:
         try:
             with self.lock:
                 with self.conn:
@@ -156,7 +156,7 @@ class MafiaBot:
         except sqlite3.Error as e:
             self.bot.reply_to(message, f'Произошла ошибка при записи на мероприятие: {e}')
 
-    def clear_registrations(self, message):
+    def clear_registrations(self, message: Message) -> None:
         try:
             with self.lock:
                 with self.conn:
@@ -167,11 +167,11 @@ class MafiaBot:
         except sqlite3.Error as e:
             self.bot.reply_to(message, f'Произошла ошибка при очистке списка зарегистрированных: {e}')
 
-    def start_polling(self):
+    def start_polling(self) -> None:
         print('Running telebot...')
         self.bot.polling()
 
-    def stop(self):
+    def stop(self) -> None:
         self.conn.close()
 
 
