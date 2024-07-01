@@ -1,13 +1,20 @@
 from telebot import TeleBot
 import sqlite3
 import threading
+from date_formatter import format_date
 
 
-class Event:
-    def __init__(self, time, location, date):
-        self.date = date
-        self.time = time
-        self.location = location
+class MafiaBot:
+    def __init__(self, token):
+        self.bot = TeleBot(token)
+        self.conn = sqlite3.connect('event.db', check_same_thread=False)
+        self.lock = threading.Lock()
+        self.cursor = self.conn.cursor()
+        self.create_tables()
+        self.setup_handlers()
+        self.date = 'default date'
+        self.time = '18:00'
+        self.location = 'https://maps.app.goo.gl/LLHVqSW4Do9ALm5R8?g_st=atm'
         self.registration_open = False
 
     def open_registration(self):
@@ -15,17 +22,6 @@ class Event:
 
     def close_registration(self):
         self.registration_open = False
-
-
-class MafiaBot:
-    def __init__(self, token, event):
-        self.bot = TeleBot(token)
-        self.event = event
-        self.conn = sqlite3.connect('event.db', check_same_thread=False)
-        self.lock = threading.Lock()
-        self.cursor = self.conn.cursor()
-        self.create_tables()
-        self.setup_handlers()
 
     def create_tables(self):
         with self.lock:
@@ -58,9 +54,11 @@ class MafiaBot:
         @self.bot.message_handler(func=lambda message: '@la_baza_bot' in message.text)
         def handle_message(message):
             try:
-                parts = message.text.split(' ', 3)
+                parts = message.text.split(' ', 2)
 
                 tag, action, data = parts[0], parts[1].lower().strip(), parts[2].lower().strip()
+                if action == 'открыть':
+                    self.start_registration(data, message)
 
                 if action == 'регистрация':
                     self.register_user(message.from_user.id, data, message)
@@ -74,6 +72,16 @@ class MafiaBot:
                 self.bot.reply_to(message, 'Неверный формат команды. Используйте "@la_baza_bot <Команда> <Данные>"')
             except Exception as e:
                 self.bot.reply_to(message, f'Произошла ошибка: {e}')
+
+    def start_registration(self, data, message):
+        self.open_registration()
+        data_list = data.split(' ')
+        self.date = format_date(data_list[0])
+        if len(data_list) == 2:
+            self.location = data_list[1]
+        if len(data_list) == 3:
+            self.time = data_list[2]
+        self.bot.reply_to(message, f'{self.date}, Запись открыта!\n\n {self.time}\n {self.location}')
 
     def register_user(self, tg_user_id, username, message):
         with self.lock:
@@ -114,9 +122,9 @@ class MafiaBot:
                 )
 
                 self.bot.reply_to(message,
-                                  f'Date запись открыта :sunglasses::\n{registration_list}')
+                                  f'{self.date}, Запись открыта!\n{registration_list}\n {self.time}\n {self.location}')
                 if len(registrations) > 12:
-                    self.event.close_registration()
+                    self.close_registration()
             else:
                 self.bot.reply_to(message,
                                   'Сначала зарегистрируйтесь с помощью команды "@la_baza_bot регистрация <Ваш ник>".')
