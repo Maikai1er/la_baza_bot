@@ -54,6 +54,11 @@ class MafiaBot:
                 self.conn.commit()
 
     def setup_handlers(self) -> None:
+        @self.bot.message_handler(func=lambda message: True)
+        def handle_message(message: Message):
+            if 'мразь' in message.text.lower():
+                self.bot.reply_to(message, 'Сам такой!')
+
         @self.bot.message_handler(commands=['start'])
         def handle_start(message: Message):
             self.bot.reply_to(message, 'Добро пожаловать! Используйте /help для списка команд.')
