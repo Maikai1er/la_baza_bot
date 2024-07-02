@@ -52,6 +52,10 @@ class MafiaBot:
                               'Добро пожаловать! Вы можете зарегистрироваться с помощью команды "@la_baza_bot '
                               'регистрация <Ваш ник>", либо записаться с помощью команды "@la_baza_bot запись <Время>"')
 
+        # @self.bot.message_handler(func=lambda message: '@la_baza_bot' in message.text)
+        # def handle_help(message):
+        #     self.bot.reply_to(message, 'Могу послать Ститча в пешее эротическое!')
+
         @self.bot.message_handler(func=lambda message: '@la_baza_bot' in message.text)
         def handle_message(message):
             try:
