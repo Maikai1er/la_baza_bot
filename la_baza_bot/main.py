@@ -17,6 +17,14 @@ class MafiaBot:
         self.location = 'https://maps.app.goo.gl/LLHVqSW4Do9ALm5R8?g_st=atm'
         self.registration_open = False
 
+    def is_group_admin(self, chat_id: int, user_id: int) -> bool:
+        try:
+            chat_member = self.bot.get_chat_member(chat_id, user_id)
+            return chat_member.status in ['creator', 'administrator']
+        except Exception as e:
+            print(f"Ошибка при получении информации о пользователе: {e}")
+            return False
+
     def open_registration(self) -> None:
         self.registration_open = True
 
@@ -82,6 +90,9 @@ class MafiaBot:
 
         @self.bot.message_handler(commands=['open'])
         def handle_open(message: Message):
+            if not self.is_group_admin(message.chat.id, message.from_user.id):
+                self.bot.reply_to(message, 'Вы не являетесь администратором группы.')
+                return
             try:
                 data = message.text.split(maxsplit=1)[1]
                 self.start_registration(data, message)
@@ -90,7 +101,14 @@ class MafiaBot:
 
         @self.bot.message_handler(commands=['clear'])
         def handle_clear(message: Message):
-            self.clear_registrations(message)
+            if not self.is_group_admin(message.chat.id, message.from_user.id):
+                self.bot.reply_to(message, 'Вы не являетесь администратором группы.')
+                return
+
+            try:
+                self.clear_registrations(message)
+            except Exception as e:
+                self.bot.reply_to(message, f'Произошла ошибка: {e}')
 
     def start_registration(self, data: str, message: Message) -> None:
         self.open_registration()
