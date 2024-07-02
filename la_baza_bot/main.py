@@ -118,6 +118,14 @@ class MafiaBot:
             except Exception as e:
                 self.bot.reply_to(message, f'Произошла ошибка: {e}')
 
+        @self.bot.message_handler(commands=['cancel'])
+        def handle_cancel(message: Message):
+            try:
+                tg_user_id = message.from_user.id
+                self.cancel_registration(tg_user_id, message)
+            except Exception as e:
+                self.bot.reply_to(message, f'Произошла ошибка: {e}')
+
     def start_registration(self, data: str, message: Message) -> None:
         self.open_registration()
         data_list = data.split(' ')
@@ -190,13 +198,68 @@ class MafiaBot:
                         )
 
                         self.bot.reply_to(message,
-                                          f'{self.date}, Запись открыта! 😎\n\n{registration_list}\n\n🕐 {self.time}\n🗺 {self.location}')
+                                          f'{self.date}, Запись открыта! 😎\n\n{registration_list}\n\n🕐 '
+                                          f'{self.time}\n🗺 {self.location}')
                         if len(registrations) > 12:
                             self.close_registration()
                     else:
                         self.bot.reply_to(message, 'Сначала зарегистрируйтесь с помощью команды /register <Ваш ник>.')
         except sqlite3.Error as e:
             self.bot.reply_to(message, f'Произошла ошибка при записи на мероприятие: {e}')
+
+    def cancel_registration(self, tg_user_id: int, message: Message) -> None:
+        try:
+            with self.lock:
+                with self.conn:
+                    cursor = self.conn.cursor()
+                    # Поиск пользователя по tg_user_id
+                    cursor.execute('''
+                    SELECT user_id, username FROM users WHERE tg_user_id = ?
+                    ''', (tg_user_id,))
+                    user = cursor.fetchone()
+
+                    if user:
+                        user_id, username = user
+                        # Проверка наличия записи на мероприятие
+                        cursor.execute('''
+                        SELECT * FROM registrations WHERE user_id = ?
+                        ''', (user_id,))
+                        existing_registration = cursor.fetchone()
+
+                        if existing_registration:
+                            # Удаление записи о регистрации
+                            cursor.execute('''
+                            DELETE FROM registrations WHERE user_id = ?
+                            ''', (user_id,))
+                            self.conn.commit()
+
+                            # Получение обновленного списка регистраций
+                            cursor.execute('''
+                            SELECT u.username, r.event_time
+                            FROM registrations r
+                            JOIN users u ON r.user_id = u.user_id
+                            ORDER BY r.registration_time
+                            ''')
+                            registrations = cursor.fetchall()
+
+                            # Формирование текста ответа бота
+                            registration_list = '\n'.join(
+                                [f'{i + 1}. {reg[0]}' + (f' {reg[1]}' if reg[1] != self.time else '') for i, reg in
+                                 enumerate(registrations)]
+                            )
+
+                            self.bot.reply_to(message,
+                                              f'{self.date}, Запись открыта! 😎\n\n{registration_list}\n\n🕐 '
+                                              f'{self.time}\n🗺 {self.location}')
+                            if len(registrations) > 12:
+                                self.close_registration()
+                        else:
+                            self.bot.reply_to(message, 'У вас нет активной записи на мероприятие.')
+                    else:
+                        self.bot.reply_to(message, 'Вы не зарегистрированы на мероприятие.')
+
+        except sqlite3.Error as e:
+            self.bot.reply_to(message, f'Произошла ошибка при отмене записи на мероприятие: {e}')
 
     def clear_registrations(self, message: Message) -> None:
         try:
