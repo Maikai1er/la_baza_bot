@@ -54,10 +54,13 @@ class MafiaBot:
                 self.conn.commit()
 
     def setup_handlers(self) -> None:
-        @self.bot.message_handler(func=lambda message: True)
-        def handle_message(message: Message):
-            if 'мразь' in message.text.lower():
-                self.bot.reply_to(message, 'Сам такой!')
+        # @self.bot.message_handler(func=lambda message: True)
+        # def handle_message(message: Message):
+        #     keywords = ['мразь', 'бля', 'хуй', 'пизда', 'еба']
+        #     for keyword in keywords:
+        #         if keyword in message.text.lower():
+        #             self.bot.reply_to(message, 'Сам такой!')
+        #             return
 
         @self.bot.message_handler(commands=['start'])
         def handle_start(message: Message):
@@ -91,7 +94,7 @@ class MafiaBot:
                     event_time = parts[1]
                 self.register_for_event(message.from_user.id, event_time, message)
             except IndexError:
-                self.bot.reply_to(message, 'Неверный формат команды. Используйте /join <Время>.')
+                self.bot.reply_to(message, 'Неверный формат команды. Используйте /join [Время].')
 
         @self.bot.message_handler(commands=['open'])
         def handle_open(message: Message):
@@ -153,10 +156,24 @@ class MafiaBot:
                         return
                     if user:
                         user_id, username = user
+                        # Проверяем, был ли пользователь уже зарегистрирован
                         cursor.execute('''
-                        INSERT INTO registrations (user_id, event_time)
-                        VALUES (?, ?)
-                        ''', (user_id, event_time))
+                        SELECT * FROM registrations WHERE user_id = ?
+                        ''', (user_id,))
+                        existing_registration = cursor.fetchone()
+
+                        if existing_registration:
+                            # Если пользователь уже зарегистрирован, обновляем время мероприятия
+                            cursor.execute('''
+                            UPDATE registrations SET event_time = ? WHERE user_id = ?
+                            ''', (event_time, user_id))
+                        else:
+                            # Если пользователь не был зарегистрирован ранее, добавляем новую запись
+                            cursor.execute('''
+                            INSERT INTO registrations (user_id, event_time)
+                            VALUES (?, ?)
+                            ''', (user_id, event_time))
+
                         self.conn.commit()
 
                         cursor.execute('''
