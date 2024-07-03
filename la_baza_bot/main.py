@@ -22,7 +22,7 @@ class MafiaBot:
             chat_member = self.bot.get_chat_member(chat_id, user_id)
             return chat_member.status in ['creator', 'administrator']
         except Exception as e:
-            print(f"Ошибка при получении информации о пользователе: {e}")
+            print(f'Ошибка при получении информации о пользователе: {e}')
             return False
 
     def open_registration(self) -> None:
@@ -54,13 +54,11 @@ class MafiaBot:
                 self.conn.commit()
 
     def setup_handlers(self) -> None:
-        # @self.bot.message_handler(func=lambda message: True)
-        # def handle_message(message: Message):
-        #     keywords = ['мразь', 'бля', 'хуй', 'пизда', 'еба']
-        #     for keyword in keywords:
-        #         if keyword in message.text.lower():
-        #             self.bot.reply_to(message, 'Сам такой!')
-        #             return
+        @self.bot.message_handler(func=lambda message: any(keyword in message.text.lower()
+                                                           for keyword in ['мразь', 'бля', 'хуй', 'пизд', 'еба']))
+        def handle_message(message: Message):
+            self.bot.reply_to(message, 'Грубиян!')
+            return
 
         @self.bot.message_handler(commands=['start'])
         def handle_start(message: Message):
@@ -74,7 +72,8 @@ class MafiaBot:
                                        '/register <Ваш ник> - Зарегистрироваться\n'
                                        '/join <Время> - Записаться на мероприятие\n'
                                        '/open <Дата> [Место] [Время] - Открыть запись на мероприятие\n'
-                                       '/clear - Очистить список зарегистрированных участников')
+                                       '/clear - Очистить список зарегистрированных участников\n'
+                                       '/cancel - Отменить запись на мероприятие')
 
         @self.bot.message_handler(commands=['register'])
         def handle_register(message: Message):
@@ -124,7 +123,7 @@ class MafiaBot:
                 tg_user_id = message.from_user.id
                 self.cancel_registration(tg_user_id, message)
             except Exception as e:
-                self.bot.reply_to(message, f'Произошла ошибка: {e}')
+                self.bot.reply_to(message, f'Неверный формат команды. Используйте /cancel')
 
     def start_registration(self, data: str, message: Message) -> None:
         self.open_registration()
@@ -164,19 +163,16 @@ class MafiaBot:
                         return
                     if user:
                         user_id, username = user
-                        # Проверяем, был ли пользователь уже зарегистрирован
                         cursor.execute('''
                         SELECT * FROM registrations WHERE user_id = ?
                         ''', (user_id,))
                         existing_registration = cursor.fetchone()
 
                         if existing_registration:
-                            # Если пользователь уже зарегистрирован, обновляем время мероприятия
                             cursor.execute('''
                             UPDATE registrations SET event_time = ? WHERE user_id = ?
                             ''', (event_time, user_id))
                         else:
-                            # Если пользователь не был зарегистрирован ранее, добавляем новую запись
                             cursor.execute('''
                             INSERT INTO registrations (user_id, event_time)
                             VALUES (?, ?)
@@ -212,7 +208,6 @@ class MafiaBot:
             with self.lock:
                 with self.conn:
                     cursor = self.conn.cursor()
-                    # Поиск пользователя по tg_user_id
                     cursor.execute('''
                     SELECT user_id, username FROM users WHERE tg_user_id = ?
                     ''', (tg_user_id,))
@@ -220,20 +215,17 @@ class MafiaBot:
 
                     if user:
                         user_id, username = user
-                        # Проверка наличия записи на мероприятие
                         cursor.execute('''
                         SELECT * FROM registrations WHERE user_id = ?
                         ''', (user_id,))
                         existing_registration = cursor.fetchone()
 
                         if existing_registration:
-                            # Удаление записи о регистрации
                             cursor.execute('''
                             DELETE FROM registrations WHERE user_id = ?
                             ''', (user_id,))
                             self.conn.commit()
 
-                            # Получение обновленного списка регистраций
                             cursor.execute('''
                             SELECT u.username, r.event_time
                             FROM registrations r
@@ -242,7 +234,6 @@ class MafiaBot:
                             ''')
                             registrations = cursor.fetchall()
 
-                            # Формирование текста ответа бота
                             registration_list = '\n'.join(
                                 [f'{i + 1}. {reg[0]}' + (f' {reg[1]}' if reg[1] != self.time else '') for i, reg in
                                  enumerate(registrations)]
