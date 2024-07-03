@@ -1,3 +1,5 @@
+import os
+
 from telebot import TeleBot
 from telebot.types import Message
 import sqlite3
@@ -265,14 +267,14 @@ class MafiaBot:
 
     def start_polling(self) -> None:
         print('Running telebot...')
-        self.bot.polling()
+        self.bot.polling(none_stop=True)
 
     def stop(self) -> None:
         self.conn.close()
 
 
 if __name__ == "__main__":
-    TOKEN = '7489778031:AAFW7ZxD4H3wQcQ4rMmSOOFFzY_-4vRCeMg'
+    TOKEN = os.getenv('TOKEN')
     bot = MafiaBot(TOKEN)
     try:
         bot.start_polling()

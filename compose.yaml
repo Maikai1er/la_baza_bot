@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  bot:
+    build: .
+    container_name: telegram_bot
+    volumes:
+      - .:/app
+    environment:
+      - TOKEN=7489778031:AAFW7ZxD4H3wQcQ4rMmSOOFFzY_-4vRCeMg
+    depends_on:
+      - db
+    networks:
+      - bot_network
+
+  db:
+    image: alpine:latest
+    container_name: sqlite_db
+    volumes:
+      - sqlite_data:/var/lib/sqlite
+    command: sh -c "apk add --no-cache sqlite && sqlite3 /var/lib/sqlite/database.db"
+    restart: always
+    networks:
+      - bot_network
+
+volumes:
+  sqlite_data:
+    driver: local
+
+networks:
+  bot_network:
+    driver: bridge
