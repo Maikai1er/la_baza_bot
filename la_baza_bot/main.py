@@ -273,7 +273,7 @@ class MafiaBot:
         self.conn.close()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     TOKEN = os.getenv('TOKEN')
     bot = MafiaBot(TOKEN)
     try:
