@@ -10,7 +10,7 @@ from date_formatter import format_date_russian
 class MafiaBot:
     def __init__(self, token: str):
         self.bot = TeleBot(token)
-        self.conn = sqlite3.connect('event.db', check_same_thread=False, timeout=10)
+        self.conn = sqlite3.connect('../event.db', check_same_thread=False, timeout=10)
         self.lock = threading.Lock()
         self.create_tables()
         self.setup_handlers()
