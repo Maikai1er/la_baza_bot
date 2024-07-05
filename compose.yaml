@@ -8,4 +8,4 @@ services:
       - .:/app
     environment:
       - TOKEN=7489778031:AAFW7ZxD4H3wQcQ4rMmSOOFFzY_-4vRCeMg
-    restart: unless-stopped
+#    restart: unless-stopped

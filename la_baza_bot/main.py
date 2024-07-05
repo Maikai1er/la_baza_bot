@@ -64,10 +64,27 @@ class MafiaBot:
 
         @self.bot.message_handler(commands=['start'])
         def handle_start(message: Message):
-            self.bot.reply_to(message, 'Добро пожаловать! Используйте /help для получения списка команд.')
+            if not self.is_allowed_thread(message):
+                self.bot.reply_to(message, 'Вы не можете использовать команды в этом топике.')
+                return
+            if message.message_thread_id == 2:
+                self.bot.reply_to(message, f'Добро пожаловать! Используйте /help для получения списка команд.\n'
+                                           f'Вы в треде запись, айди {message.message_thread_id}')
+                return
+            elif message.message_thread_id == 13:
+                self.bot.reply_to(message, f'Добро пожаловать! Используйте /help для получения списка команд.\n'
+                                           f'Вы в треде рандом, айди {message.message_thread_id}')
+                return
+            else:
+                self.bot.reply_to(message, f'Добро пожаловать! Используйте /help для получения списка команд.\n'
+                                           f'Вы в другом треде, айди {message.message_thread_id}')
+                return
 
         @self.bot.message_handler(commands=['help'])
         def handle_help(message: Message):
+            if not self.is_allowed_thread(message):
+                self.bot.reply_to(message, 'Вы не можете использовать команды в этом топике.')
+                return
             self.bot.reply_to(message, 'Доступные команды:\n'
                                        '/start - Начать взаимодействие с ботом.\n'
                                        '/help - Список команд.\n'
@@ -80,6 +97,9 @@ class MafiaBot:
 
         @self.bot.message_handler(commands=['register'])
         def handle_register(message: Message):
+            if not self.is_allowed_thread(message):
+                self.bot.reply_to(message, 'Вы не можете использовать команды в этом топике.')
+                return
             try:
                 username = message.text.split(maxsplit=1)[1]
                 with self.lock:
@@ -96,6 +116,9 @@ class MafiaBot:
 
         @self.bot.message_handler(commands=['join'])
         def handle_join(message: Message):
+            if not self.is_allowed_thread(message):
+                self.bot.reply_to(message, 'Вы не можете использовать команды в этом топике.')
+                return
             try:
                 parts = message.text.split(maxsplit=1)
                 if len(parts) == 1:
@@ -110,6 +133,9 @@ class MafiaBot:
         def handle_open(message: Message):
             if not self.is_group_admin(message.chat.id, message.from_user.id):
                 self.bot.reply_to(message, 'Вы не являетесь администратором группы.')
+                return
+            if not self.is_allowed_thread(message):
+                self.bot.reply_to(message, 'Вы не можете использовать команды в этом топике.')
                 return
             try:
                 data = message.text.split(maxsplit=1)[1]
@@ -126,6 +152,9 @@ class MafiaBot:
 
         @self.bot.message_handler(commands=['clear'])
         def handle_clear(message: Message):
+            if not self.is_allowed_thread(message):
+                self.bot.reply_to(message, 'Вы не можете использовать команды в этом топике.')
+                return
             if not self.is_group_admin(message.chat.id, message.from_user.id):
                 self.bot.reply_to(message, 'Вы не являетесь администратором группы.')
                 return
@@ -142,11 +171,24 @@ class MafiaBot:
 
         @self.bot.message_handler(commands=['cancel'])
         def handle_cancel(message: Message):
+            if not self.is_allowed_thread(message):
+                self.bot.reply_to(message, 'Вы не можете использовать команды в этом топике.')
+                return
             try:
                 tg_user_id = message.from_user.id
                 self.cancel_registration(tg_user_id, message)
             except IndexError:
                 self.bot.reply_to(message, 'Неверный формат команды. Используйте /cancel.')
+
+    def is_allowed_thread(self, message: Message) -> bool:
+        try:
+            if message.message_thread_id == 2:
+                return True
+            else:
+                return False
+        except Exception:
+            self.bot.reply_to(message, 'Произошла непредвиденная ошибка.')
+            return False
 
     def register_for_event(self, tg_user_id: int, event_time: str, message: Message) -> None:
         try:
@@ -260,7 +302,8 @@ class MafiaBot:
 
 
 if __name__ == '__main__':
-    TOKEN = os.getenv('TOKEN')
+    # TOKEN = os.getenv('TOKEN')
+    TOKEN = '7489778031:AAFW7ZxD4H3wQcQ4rMmSOOFFzY_-4vRCeMg'
     bot = MafiaBot(TOKEN)
     try:
         bot.start_polling()
