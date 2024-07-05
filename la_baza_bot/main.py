@@ -20,12 +20,13 @@ class MafiaBot:
         self.registration_open = False
 
     def is_group_admin(self, chat_id: int, user_id: int) -> bool:
-        try:
-            chat_member = self.bot.get_chat_member(chat_id, user_id)
-            return chat_member.status in ['creator', 'administrator']
-        except Exception:
-            print(f'Ошибка при получении информации о пользователе.')
-            return False
+        # try:
+        #     chat_member = self.bot.get_chat_member(chat_id, user_id)
+        #     return chat_member.status in ['creator', 'administrator']
+        # except Exception:
+        #     print(f'Ошибка при получении информации о пользователе.')
+        #     return False
+        return True
 
     def open_registration(self) -> None:
         self.registration_open = True
@@ -47,37 +48,27 @@ class MafiaBot:
                 cursor.execute('''
                 CREATE TABLE IF NOT EXISTS registrations (
                     registration_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER,
+                    username TEXT,
                     event_time TEXT,
-                    registration_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (user_id) REFERENCES users (user_id)
+                    registration_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
                 ''')
                 self.conn.commit()
 
     def setup_handlers(self) -> None:
-        @self.bot.message_handler(func=lambda message: any(keyword in message.text.lower()
-                                                           for keyword in ['мраз', 'бля', 'хуй', 'пизд', 'еба']))
-        def handle_message(message: Message):
-            self.bot.reply_to(message, 'Грубиян!')
-            return
+        # # @self.bot.message_handler(func=lambda message: any(keyword in message.text.lower()
+        # #                                                    for keyword in ['мраз', 'бля', 'хуй', 'пизд', 'еба', 'муд', 'пид']))
+        # def handle_message(message: Message):
+        #     self.bot.reply_to(message, 'Грубиян!')
+        #     return
 
         @self.bot.message_handler(commands=['start'])
         def handle_start(message: Message):
             if not self.is_allowed_thread(message):
                 self.bot.reply_to(message, 'Вы не можете использовать команды в этом топике.')
                 return
-            if message.message_thread_id == 2:
-                self.bot.reply_to(message, f'Добро пожаловать! Используйте /help для получения списка команд.\n'
-                                           f'Вы в треде запись, айди {message.message_thread_id}')
-                return
-            elif message.message_thread_id == 13:
-                self.bot.reply_to(message, f'Добро пожаловать! Используйте /help для получения списка команд.\n'
-                                           f'Вы в треде рандом, айди {message.message_thread_id}')
-                return
             else:
-                self.bot.reply_to(message, f'Добро пожаловать! Используйте /help для получения списка команд.\n'
-                                           f'Вы в другом треде, айди {message.message_thread_id}')
+                self.bot.reply_to(message, f'Добро пожаловать! Используйте /help для получения списка команд {message.message_thread_id}.')
                 return
 
         @self.bot.message_handler(commands=['help'])
@@ -90,9 +81,10 @@ class MafiaBot:
                                        '/help - Список команд.\n'
                                        '/register <Ваш ник> - Зарегистрироваться.\n'
                                        '/join [Время] - Записаться на мероприятие.\n'
+                                       '/invite <Ник записываемого> [Время].\n'
                                        '/open <Дата> [Место] [Время] - Открыть запись на мероприятие.\n'
                                        '/clear - Очистить список зарегистрированных участников.\n'
-                                       '/cancel - Отменить запись на мероприятие.\n'
+                                       '/cancel [Ник записавшегося] - Отменить запись на игровой вечер.\n'
                                        '[Необязательные аргументы], <Обязательные аргументы>.')
 
         @self.bot.message_handler(commands=['register'])
@@ -128,6 +120,19 @@ class MafiaBot:
                 self.register_for_event(message.from_user.id, event_time, message)
             except IndexError:
                 self.bot.reply_to(message, 'Неверный формат команды. Используйте /join [Время].')
+
+        @self.bot.message_handler(commands=['invite'])
+        def handle_invite(message: Message):
+            if not self.is_allowed_thread(message):
+                self.bot.reply_to(message, 'Вы не можете использовать команды в этом топике.')
+                return
+            try:
+                parts = message.text.split(' ')
+                event_time = self.time if len(parts) == 2 else parts[2]
+                nickname = parts[1]
+                self.invite_registration(nickname, event_time, message)
+            except IndexError:
+                self.bot.reply_to(message, 'Неверный формат команды. Используйте /invite <Ник записываемого> [Время].')
 
         @self.bot.message_handler(commands=['open'])
         def handle_open(message: Message):
@@ -175,123 +180,172 @@ class MafiaBot:
                 self.bot.reply_to(message, 'Вы не можете использовать команды в этом топике.')
                 return
             try:
-                tg_user_id = message.from_user.id
-                self.cancel_registration(tg_user_id, message)
+                parts = message.text.split(maxsplit=1)
+                if len(parts) == 1:
+                    tg_user_id = message.from_user.id
+                    self.cancel_registration_by_id(tg_user_id, message)
+                elif len(parts) == 2:
+                    username = parts[1]
+                    self.cancel_registration_by_username(username, message)
+                else:
+                    self.bot.reply_to(message, 'Неверный формат команды. Используйте /cancel или /cancel <Никнейм>.')
             except IndexError:
-                self.bot.reply_to(message, 'Неверный формат команды. Используйте /cancel.')
+                self.bot.reply_to(message, 'Неверный формат команды. Используйте /cancel или /cancel <Никнейм>.')
 
     def is_allowed_thread(self, message: Message) -> bool:
-        try:
-            if message.message_thread_id == 2:
-                return True
-            else:
-                return False
-        except Exception:
-            self.bot.reply_to(message, 'Произошла непредвиденная ошибка.')
-            return False
+        # try:
+        #     if message.message_thread_id == 6911:
+        #         return True
+        #     else:
+        #         return False
+        # except Exception:
+        #     self.bot.reply_to(message, 'Произошла непредвиденная ошибка.')
+        #     return False
+        return True
 
     def register_for_event(self, tg_user_id: int, event_time: str, message: Message) -> None:
         try:
             with self.lock:
                 with self.conn:
                     cursor = self.conn.cursor()
+
                     cursor.execute('''
-                    SELECT user_id, username FROM users WHERE tg_user_id = ?
+                    SELECT username FROM users WHERE tg_user_id = ?
                     ''', (tg_user_id,))
                     user = cursor.fetchone()
                     if not self.registration_open:
-                        self.bot.reply_to(message, 'Нет активной записи на игры.')
+                        self.bot.reply_to(message, 'Нет активной записи на игровой вечер.')
                         return
                     if user:
-                        user_id, username = user
+                        username = user[0]
                         cursor.execute('''
-                        SELECT * FROM registrations WHERE user_id = ?
-                        ''', (user_id,))
+                        SELECT * FROM registrations WHERE username = ?
+                        ''', (username,))
                         existing_registration = cursor.fetchone()
 
                         if existing_registration:
                             cursor.execute('''
-                            UPDATE registrations SET event_time = ? WHERE user_id = ?
-                            ''', (event_time, user_id))
+                            UPDATE registrations SET event_time = ? WHERE username = ?
+                            ''', (event_time, username))
                         else:
                             cursor.execute('''
-                            INSERT INTO registrations (user_id, event_time)
+                            INSERT INTO registrations (username, event_time)
                             VALUES (?, ?)
-                            ''', (user_id, event_time))
+                            ''', (username, event_time))
 
                         self.conn.commit()
 
-                        cursor.execute('''
-                        SELECT u.username, r.event_time
-                        FROM registrations r
-                        JOIN users u ON r.user_id = u.user_id
-                        ORDER BY r.registration_time
-                        ''')
-                        registrations = cursor.fetchall()
-
-                        registration_list = '\n'.join(
-                            [f'{i + 1}. {reg[0]}' + (f' {reg[1]}' if reg[1] != self.time else '') for i, reg in
-                             enumerate(registrations)]
-                        )
-
-                        self.bot.reply_to(message,
-                                          f'{self.date}, Запись открыта! 😎\n\n{registration_list}\n\n🕐 '
-                                          f'{self.time}\n🗺 {self.location}')
-                        if len(registrations) > 12:
-                            self.close_registration()
+                        self.send_registration_list(message)
                     else:
                         self.bot.reply_to(message, 'Сначала зарегистрируйтесь с помощью команды /register <Ваш ник>.')
         except sqlite3.Error:
-            self.bot.reply_to(message, f'Произошла ошибка при записи на мероприятие.')
+            self.bot.reply_to(message, 'Произошла ошибка при записи на игровой вечер.')
 
-    def cancel_registration(self, tg_user_id: int, message: Message) -> None:
+    def invite_registration(self, username: str, event_time: str, message: Message) -> None:
+        try:
+            with self.lock:
+                with self.conn:
+                    cursor = self.conn.cursor()
+
+                    if not self.registration_open:
+                        self.bot.reply_to(message, 'Нет активной записи на игровой вечер.')
+                        return
+
+                    cursor.execute('''
+                    SELECT * FROM registrations WHERE username = ?
+                    ''', (username,))
+                    existing_registration = cursor.fetchone()
+
+                    if existing_registration:
+                        cursor.execute('''
+                        UPDATE registrations SET event_time = ? WHERE username = ?
+                        ''', (event_time, username))
+                    else:
+                        cursor.execute('''
+                        INSERT INTO registrations (username, event_time)
+                        VALUES (?, ?)
+                        ''', (username, event_time))
+
+                    self.conn.commit()
+
+                    self.send_registration_list(message)
+
+        except sqlite3.Error:
+            self.bot.reply_to(message, 'Произошла ошибка при записи на игровой вечер.')
+
+    def cancel_registration_by_id(self, tg_user_id: int, message: Message) -> None:
         try:
             with self.lock:
                 with self.conn:
                     cursor = self.conn.cursor()
                     cursor.execute('''
-                    SELECT user_id, username FROM users WHERE tg_user_id = ?
+                    SELECT username FROM users WHERE tg_user_id = ?
                     ''', (tg_user_id,))
                     user = cursor.fetchone()
 
-                    if user:
-                        user_id, username = user
+                    if not user:
+                        self.bot.reply_to(message, 'Вы не зарегистрированы на игровой вечер.')
+                        return
+
+                    username = user[0]
+                    cursor.execute('''
+                    SELECT * FROM registrations WHERE username = ?
+                    ''', (username,))
+                    existing_registration = cursor.fetchone()
+
+                    if existing_registration:
                         cursor.execute('''
-                        SELECT * FROM registrations WHERE user_id = ?
-                        ''', (user_id,))
-                        existing_registration = cursor.fetchone()
+                        DELETE FROM registrations WHERE username = ?
+                        ''', (username,))
+                        self.conn.commit()
 
-                        if existing_registration:
-                            cursor.execute('''
-                            DELETE FROM registrations WHERE user_id = ?
-                            ''', (user_id,))
-                            self.conn.commit()
-
-                            cursor.execute('''
-                            SELECT u.username, r.event_time
-                            FROM registrations r
-                            JOIN users u ON r.user_id = u.user_id
-                            ORDER BY r.registration_time
-                            ''')
-                            registrations = cursor.fetchall()
-
-                            registration_list = '\n'.join(
-                                [f'{i + 1}. {reg[0]}' + (f' {reg[1]}' if reg[1] != self.time else '') for i, reg in
-                                 enumerate(registrations)]
-                            )
-
-                            self.bot.reply_to(message,
-                                              f'{self.date}, Запись открыта! 😎\n\n{registration_list}\n\n🕐 '
-                                              f'{self.time}\n🗺 {self.location}')
-                            if len(registrations) > 12:
-                                self.close_registration()
-                        else:
-                            self.bot.reply_to(message, 'У вас нет активной записи на мероприятие.')
+                        self.send_registration_list(message)
                     else:
-                        self.bot.reply_to(message, 'Вы не зарегистрированы на мероприятие.')
-
+                        self.bot.reply_to(message, 'У вас нет активной записи на игровой вечер.')
         except sqlite3.Error:
-            self.bot.reply_to(message, f'Произошла ошибка при отмене записи на мероприятие.')
+            self.bot.reply_to(message, 'Произошла ошибка при отмене записи на игровой вечер.')
+
+    def cancel_registration_by_username(self, username: str, message: Message) -> None:
+        try:
+            with self.lock:
+                with self.conn:
+                    cursor = self.conn.cursor()
+                    cursor.execute('''
+                    SELECT * FROM registrations WHERE username = ?
+                    ''', (username,))
+                    existing_registration = cursor.fetchone()
+
+                    if existing_registration:
+                        cursor.execute('''
+                        DELETE FROM registrations WHERE username = ?
+                        ''', (username,))
+                        self.conn.commit()
+
+                        self.send_registration_list(message)
+                    else:
+                        self.bot.reply_to(message, 'У этого игрока нет активной записи на игровой вечер.')
+        except sqlite3.Error:
+            self.bot.reply_to(message, 'Произошла ошибка при отмене записи на игровой вечер.')
+
+    def send_registration_list(self, message: Message) -> None:
+        with self.conn:
+            cursor = self.conn.cursor()
+            cursor.execute('''
+            SELECT username, event_time
+            FROM registrations
+            ORDER BY registration_time
+            ''')
+            registrations = cursor.fetchall()
+
+            registration_list = '\n'.join(
+                [f'{i + 1}. {reg[0]}' + (f' {reg[1]}' if reg[1] != self.time else '') for i, reg in
+                 enumerate(registrations)]
+            )
+            registration_state = 'открыта' if len(registrations) < 12 else 'закрыта'
+            self.bot.reply_to(message, f'{self.date}, Запись {registration_state}! 😎\n\n{registration_list}\n\n🕐 '
+                              f'{self.time}\n🗺 {self.location}')
+            if len(registrations) == 12:
+                self.close_registration()
 
     def start_polling(self) -> None:
         print('Running telebot...')
@@ -302,8 +356,8 @@ class MafiaBot:
 
 
 if __name__ == '__main__':
-    # TOKEN = os.getenv('TOKEN')
-    TOKEN = '7489778031:AAFW7ZxD4H3wQcQ4rMmSOOFFzY_-4vRCeMg'
+    TOKEN = os.getenv('TOKEN')
+    # TOKEN = '7489778031:AAFW7ZxD4H3wQcQ4rMmSOOFFzY_-4vRCeMg'
     bot = MafiaBot(TOKEN)
     try:
         bot.start_polling()
