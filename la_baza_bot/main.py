@@ -26,7 +26,6 @@ class MafiaBot:
         except Exception:
             print(f'Ошибка при получении информации о пользователе.')
             return False
-        # return True
 
     def open_registration(self) -> None:
         self.registration_open = True
@@ -77,10 +76,11 @@ class MafiaBot:
                                        '/register <Ваш никнейм> - Зарегистрироваться.\n'
                                        '/join [Комментарий] - Записаться на игровой вечер.\n'
                                        '/invite <Никнейм> [Комментарий].\n'
+                                       '/cancel [Никнейм] - Отменить запись на игровой вечер.\n'
+                                       'ТОЛЬКО ДЛЯ ЛОЛЫ:'
                                        '/open <Дата> [Место] [Время] - Открыть запись на игровой вечер.\n'
                                        '/clear - Очистить список записанных участников.\n'
-                                       '/cancel [Никнейм] - Отменить запись на игровой вечер.\n'
-                                       '* [Необязательно], <Обязательно>.')
+                                       '* <Обязательно>, [Необязательно].')
 
         @self.bot.message_handler(commands=['register'])
         def handle_register(message: Message):
