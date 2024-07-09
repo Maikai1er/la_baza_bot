@@ -20,13 +20,13 @@ class MafiaBot:
         self.registration_open = False
 
     def is_group_admin(self, chat_id: int, user_id: int) -> bool:
-        # try:
-        #     chat_member = self.bot.get_chat_member(chat_id, user_id)
-        #     return chat_member.status in ['creator', 'administrator']
-        # except Exception:
-        #     print(f'Ошибка при получении информации о пользователе.')
-        #     return False
-        return True
+        try:
+            chat_member = self.bot.get_chat_member(chat_id, user_id)
+            return chat_member.status in ['creator', 'administrator']
+        except Exception:
+            print(f'Ошибка при получении информации о пользователе.')
+            return False
+        # return True
 
     def open_registration(self) -> None:
         self.registration_open = True
@@ -56,19 +56,14 @@ class MafiaBot:
                 self.conn.commit()
 
     def setup_handlers(self) -> None:
-        # # @self.bot.message_handler(func=lambda message: any(keyword in message.text.lower()
-        # #                                                    for keyword in ['мраз', 'бля', 'хуй', 'пизд', 'еба', 'муд', 'пид']))
-        # def handle_message(message: Message):
-        #     self.bot.reply_to(message, 'Грубиян!')
-        #     return
-
         @self.bot.message_handler(commands=['start'])
         def handle_start(message: Message):
             if not self.is_allowed_thread(message):
                 self.bot.reply_to(message, 'Вы не можете использовать команды в этом топике.')
                 return
             else:
-                self.bot.reply_to(message, f'Добро пожаловать! Используйте /help для получения списка команд {message.message_thread_id}.')
+                self.bot.reply_to(message, f'Добро пожаловать! Используйте /help для получения списка команд '
+                                           f'{message.message_thread_id}.')
                 return
 
         @self.bot.message_handler(commands=['help'])
@@ -79,13 +74,13 @@ class MafiaBot:
             self.bot.reply_to(message, 'Доступные команды:\n'
                                        '/start - Начать взаимодействие с ботом.\n'
                                        '/help - Список команд.\n'
-                                       '/register <Ваш ник> - Зарегистрироваться.\n'
-                                       '/join [Время] - Записаться на мероприятие.\n'
-                                       '/invite <Ник записываемого> [Время].\n'
-                                       '/open <Дата> [Место] [Время] - Открыть запись на мероприятие.\n'
-                                       '/clear - Очистить список зарегистрированных участников.\n'
-                                       '/cancel [Ник записавшегося] - Отменить запись на игровой вечер.\n'
-                                       '[Необязательные аргументы], <Обязательные аргументы>.')
+                                       '/register <Ваш никнейм> - Зарегистрироваться.\n'
+                                       '/join [Комментарий] - Записаться на игровой вечер.\n'
+                                       '/invite <Никнейм> [Комментарий].\n'
+                                       '/open <Дата> [Место] [Время] - Открыть запись на игровой вечер.\n'
+                                       '/clear - Очистить список записанных участников.\n'
+                                       '/cancel [Никнейм] - Отменить запись на игровой вечер.\n'
+                                       '* [Необязательно], <Обязательно>.')
 
         @self.bot.message_handler(commands=['register'])
         def handle_register(message: Message):
@@ -100,11 +95,11 @@ class MafiaBot:
                         cursor.execute('''
                         INSERT OR REPLACE INTO users (tg_user_id, username)
                         VALUES (?, ?)
-                        ''', (message.from_user.id, username.capitalize()))
+                        ''', (message.from_user.id, username))
                         self.conn.commit()
-                self.bot.reply_to(message, f'Вы успешно зарегистрированы под ником {username.capitalize()}!')
+                self.bot.reply_to(message, f'Вы успешно зарегистрированы под ником {username}!')
             except IndexError:
-                self.bot.reply_to(message, 'Неверный формат команды. Используйте /register <Ваш ник>.')
+                self.bot.reply_to(message, 'Неверный формат команды. Используйте /register <Ваш никнейм>.')
 
         @self.bot.message_handler(commands=['join'])
         def handle_join(message: Message):
@@ -119,7 +114,7 @@ class MafiaBot:
                     event_time = parts[1]
                 self.register_for_event(message.from_user.id, event_time, message)
             except IndexError:
-                self.bot.reply_to(message, 'Неверный формат команды. Используйте /join [Время].')
+                self.bot.reply_to(message, 'Неверный формат команды. Используйте /join [Комментарий].')
 
         @self.bot.message_handler(commands=['invite'])
         def handle_invite(message: Message):
@@ -132,7 +127,7 @@ class MafiaBot:
                 nickname = parts[1]
                 self.invite_registration(nickname, event_time, message)
             except IndexError:
-                self.bot.reply_to(message, 'Неверный формат команды. Используйте /invite <Ник записываемого> [Время].')
+                self.bot.reply_to(message, 'Неверный формат команды. Используйте /invite <Никнейм> [Комментарий].')
 
         @self.bot.message_handler(commands=['open'])
         def handle_open(message: Message):
@@ -193,15 +188,14 @@ class MafiaBot:
                 self.bot.reply_to(message, 'Неверный формат команды. Используйте /cancel или /cancel <Никнейм>.')
 
     def is_allowed_thread(self, message: Message) -> bool:
-        # try:
-        #     if message.message_thread_id == 6911:
-        #         return True
-        #     else:
-        #         return False
-        # except Exception:
-        #     self.bot.reply_to(message, 'Произошла непредвиденная ошибка.')
-        #     return False
-        return True
+        try:
+            if message.message_thread_id == 2:
+                return True
+            else:
+                return False
+        except Exception:
+            self.bot.reply_to(message, 'Произошла непредвиденная ошибка.')
+            return False
 
     def register_for_event(self, tg_user_id: int, event_time: str, message: Message) -> None:
         try:
@@ -237,7 +231,8 @@ class MafiaBot:
 
                         self.send_registration_list(message)
                     else:
-                        self.bot.reply_to(message, 'Сначала зарегистрируйтесь с помощью команды /register <Ваш ник>.')
+                        self.bot.reply_to(message, 'Сначала зарегистрируйтесь с помощью команды /register '
+                                                   '<Ваш никнейм>.')
         except sqlite3.Error:
             self.bot.reply_to(message, 'Произошла ошибка при записи на игровой вечер.')
 
@@ -356,8 +351,8 @@ class MafiaBot:
 
 
 if __name__ == '__main__':
-    TOKEN = os.getenv('TOKEN')
-    # TOKEN = '7489778031:AAFW7ZxD4H3wQcQ4rMmSOOFFzY_-4vRCeMg'
+    # TOKEN = os.getenv('TOKEN')
+    TOKEN = '7489778031:AAFW7ZxD4H3wQcQ4rMmSOOFFzY_-4vRCeMg'
     bot = MafiaBot(TOKEN)
     try:
         bot.start_polling()
