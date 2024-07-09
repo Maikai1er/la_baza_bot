@@ -55,14 +55,21 @@ class MafiaBot:
                 self.conn.commit()
 
     def setup_handlers(self) -> None:
+        @self.bot.message_handler(func=lambda message: message.text == '+' and self.is_allowed_thread(message))
+        def handle_plus(message: Message):
+            try:
+                event_time = self.time
+                self.register_for_event(message.from_user.id, event_time, message)
+            except Exception:
+                self.bot.reply_to(message, 'Произошла ошибка при записи на игровой вечер.')
+
         @self.bot.message_handler(commands=['start'])
         def handle_start(message: Message):
             if not self.is_allowed_thread(message):
-                self.bot.reply_to(message, 'Вы не можете использовать команды в этом топике.')
+                self.bot.reply_to(message, f'Вы не можете использовать команды в этом топике.')
                 return
             else:
-                self.bot.reply_to(message, f'Добро пожаловать! Используйте /help для получения списка команд '
-                                           f'{message.message_thread_id}.')
+                self.bot.reply_to(message, f'Добро пожаловать! Используйте /help для получения списка команд.')
                 return
 
         @self.bot.message_handler(commands=['help'])
@@ -189,7 +196,8 @@ class MafiaBot:
 
     def is_allowed_thread(self, message: Message) -> bool:
         try:
-            if message.message_thread_id == 2:
+            if message.message_thread_id == 6911:
+                # в тестовой беседе айди равен двум
                 return True
             else:
                 return False
